@@ -2,7 +2,7 @@
 title: "Food Delivery Time"
 author: "Tria Rahmat Mauludin"
 date: "2/25/2022"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
