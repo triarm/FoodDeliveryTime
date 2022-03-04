@@ -1,0 +1,141 @@
+---
+title: "Food Delivery Time"
+author: "Tria Rahmat Mauludin"
+date: "2/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+# Import Library
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+```
+
+# Import Data
+```{r}
+library(readxl)
+train_data <- read_excel("./dataset/Data_Train.xlsx")
+test_data <- read_excel("./dataset/Data_Test.xlsx")
+head(train_data)
+```
+```{r}
+str(train_data)
+```
+```{r}
+#unique(train_data$Location)
+train_data$Location <- word(train_data$Location, -1, sep=",") %>% trimws() #%>% 
+train_data$Location[train_data$Location %in% c("Mumbai", "Mumbai CST Area" , "Mumbai Central")] <- "Mumbai"
+train_data$Location[train_data$Location %in% c("Bangalore", "Electronic City", "Marathalli", "Whitefield")] <- "Bangalore"
+train_data$Location[train_data$Location %in% c("India Gate", "Delhi", "Delhi University-GTB Nagar", "Delhi Cantt." , "Timarpur", "Noida")] <- "Delhi"
+train_data$Location[train_data$Location %in% c("Gurgoan", "Gurgaon")] <- "Gurgaon"
+train_data$Location[train_data$Location %in% c("Maharashtra", "Pune", "Pune University")] <- "Maharashtra"
+train_data$Location[train_data$Location %in% c("Hyderabad", "Begumpet", "Majestic")] <- "Hyderabad"
+```
+
+```{r}
+train_data <- train_data %>% 
+  mutate(Location = as.factor(Location))
+str(train_data)
+```
+
+
+```{r}
+library(splitstackshape)
+splitstackshape:::charMat(strsplit(train_data$Cuisines, ", "), fill = 0L)
+```
+
+```{r}
+library(stringr)
+clean_data <- train_data %>%
+              mutate(
+                Location = as.factor(Location),
+                Average_Cost = gsub('[\u20b9]|,', '', Average_Cost) %>% 
+                  as.numeric(),
+                Minimum_Order = gsub('[\u20b9]|,', '', Average_Cost) %>% 
+                  as.numeric(),
+                #Rating = replace(Rating, (Rating =="-" |Rating == "NEW"), "0") %>% as.numeric(Rating),
+                #Votes = replace(Votes, Votes == "-", "0") %>% as.numeric(Votes),
+                #Reviews = replace(Reviews, Reviews == "-", "0") %>% as.numeric(Reviews),
+                Rating = as.numeric(Rating),
+                Votes = as.numeric(Votes),
+                Reviews = as.numeric(Reviews),
+                Delivery_Time = gsub('[ minutes]', '', Delivery_Time) %>% 
+                  as.numeric()
+              ) %>%
+              na.omit()
+clean_data
+```
+```{r}
+cuisines <- splitstackshape:::charMat(strsplit(clean_data$Cuisines, ", "), fill = "0") %>% 
+  as.data.frame(., stringsAsFactors = TRUE)
+
+cuisines2 <- splitstackshape:::charMat(strsplit(clean_data$Cuisines, ", "), fill = 0) %>% 
+  as.data.frame(.)
+
+cuisines2 <- as.data.frame(colSums(cuisines2), )
+colnames(cuisines2) <- c("Freq")
+cuisines2[order(cuisines2$Freq),]
+#cbind(clean_data, cuisines)
+```
+
+
+
+```{r}
+clean_data %>% 
+  cbind(., cuisines) %>% 
+  select(-c(Restaurant, Cuisines))
+```
+
+```{r}
+colSums(is.na(clean_data))
+```
+```{r}
+cor(clean_data[,sapply(clean_data, is.numeric)])
+```
+```{r}
+str(clean_data)
+```
+
+```{r}
+model1 <- glm(formula = Delivery_Time~Location+Average_Cost+Rating+Votes+Reviews, data = clean_data, family = Gamma)
+summary(model1)
+```
+
+```{r}
+hist(clean_data$Delivery_Time)
+```
+
+```{r}
+clean_data[idx,]
+```
+
+```{r}
+train_data[idx,]
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
