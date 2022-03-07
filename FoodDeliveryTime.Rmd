@@ -120,6 +120,17 @@ We will remove the " minutes" then convert it to numeric
 ```{r}
 gsub('[ minutes]', '', train_data$Delivery_Time) %>%  as.numeric() %>% unique()
 ```
+Splitting data into train_data and validation_data
+```{r}
+set.seed(100)
+
+splitted <- initial_split(train_data, prop = 0.8, strata = 'Delivery_Time')
+splitted
+```
+```{r}
+training(splitted)
+```
+
 # Pipeline using tidymodels
 ```{r}
 transform_location <- function(Location){
@@ -139,7 +150,7 @@ transform_location <- function(Location){
     return("Kolkata")
   }
 }
-rec <- recipe(Delivery_Time~., data = train_data) %>% 
+rec <- recipe(Delivery_Time~., data = training(splitted)) %>% 
   step_select(-Restaurant) %>% 
   step_mutate(
     Location =  word(Location, -1, sep=",") %>% trimws() %>% sapply(function(x) transform_location(x)),
@@ -148,16 +159,46 @@ rec <- recipe(Delivery_Time~., data = train_data) %>%
     Rating = as.character(Rating) %>% as.numeric(),
     Votes = as.character(Votes) %>% as.numeric(),
     Reviews = as.character(Reviews) %>% as.numeric(),
-    Delivery_Time = gsub('[ minutes]', '', train_data$Delivery_Time) %>%  as.numeric()
+    Delivery_Time = gsub('[ minutes]', '', Delivery_Time) %>%  as.factor()
   ) %>% 
   step_dummy_extract(Cuisines, sep= ", ") %>%
-  
+  step_naomit(everything()) %>% 
   prep()
 ```
 
 ```{r}
 data_train <- juice(rec)
+data_validation <- bake(rec, testing(splitted))
 head(data_train)
+head(data_validation)
+```
+```{r}
+any(is.na(data_train))
+any(is.na(data_validation))
+```
+# Modeling
+## Regression Linear Model
+```{r}
+reg_model <- linear_reg(mode = "regression",
+                        engine = "lm") %>% 
+              fit(formula=Delivery_Time ~ Location + Average_Cost + Minimum_Order + Rating + Votes + Reviews,
+                  data=data_train)
+reg_model
+```
+## Nultinomial Regression
+```{r}
+library(nnet)
+multi_model <- multinom_reg(mode = "classification",
+                            engine = "nnet") %>% 
+                fit(formula=Delivery_Time ~ .,
+                  data=data_train, size = 10, maxit=100)
+```
+
+```{r}
+data_validation %>% 
+  select(Delivery_Time) %>% 
+  bind_cols(predict(multi_model, new_data=data_validation)) %>% 
+  accuracy(truth = Delivery_Time, .pred_class)
 ```
 
 ```{r}
