@@ -2,7 +2,13 @@
 title: "Food Delivery Time"
 author: "Tria Rahmat Mauludin"
 date: "2/25/2022"
-output: github_document
+output: 
+  html_document:
+    theme : "cosmo"
+    toc : true
+    toc_depth : 2
+    toc_float : true
+    
 ---
 
 ```{r setup, include=FALSE}
@@ -35,91 +41,50 @@ Find the unique location:
 ```{r}
 unique(train_data$Location)
 ```
-From the result above, we will generalized the location by the city (the words after last comma).
-- "Mumbai", "Mumbai CST Area" , "Mumbai Central" -> "Mumbai"
-- "Bangalore", "Electronic City", "Marathalli", "Whitefield" -> "Bangalore"
-- "India Gate", "Delhi", "Delhi University-GTB Nagar", "Delhi Cantt." , "Timarpur", "Noida" -> "Delhi"
-- "Gurgoan", "Gurgaon" -> "Gurgaon"
-- "Kolkata" -> "Kolkata"
-- "Maharashtra", "Pune", "Pune University" -> "Maharashtra"
-- "Hyderabad", "Begumpet", "Majestic" -> "Hyderabad"
-```{r}
-#train_data$Location <- word(train_data$Location, -1, sep=",") %>% trimws() #%>% 
-#train_data$Location[train_data$Location %in% c("Mumbai", "Mumbai CST Area" , "Mumbai Central")] <- "Mumbai"
-#train_data$Location[train_data$Location %in% c("Bangalore", "Electronic City", "Marathalli", "Whitefield")] <- "Bangalore"
-#train_data$Location[train_data$Location %in% c("India Gate", "Delhi", "Delhi University-GTB Nagar", "Delhi Cantt." , "Timarpur", "Noida")] <- "Delhi"
-#train_data$Location[train_data$Location %in% c("Gurgoan", "Gurgaon")] <- "Gurgaon"
-#train_data$Location[train_data$Location %in% c("Maharashtra", "Pune", "Pune University")] <- "Maharashtra"
-#train_data$Location[train_data$Location %in% c("Hyderabad", "Begumpet", "Majestic")] <- "Hyderabad"
-```
 
-After that, we change the type of Location into factor
-```{r}
-#train_data <- train_data %>% 
-#  mutate(Location = as.factor(Location))
-str(train_data)
-```
+From the result above, we will generalized the location by the city (the words after last comma).
+
+- "Mumbai", "Mumbai CST Area" , "Mumbai Central" -> "Mumbai"
+
+- "Bangalore", "Electronic City", "Marathalli", "Whitefield" -> "Bangalore"
+
+- "India Gate", "Delhi", "Delhi University-GTB Nagar", "Delhi Cantt." , "Timarpur", "Noida" -> 
+"Delhi"
+
+- "Gurgoan", "Gurgaon" -> "Gurgaon"
+
+- "Kolkata" -> "Kolkata"
+
+- "Maharashtra", "Pune", "Pune University" -> "Maharashtra"
+
+- "Hyderabad", "Begumpet", "Majestic" -> "Hyderabad"
+
+Then, we will change the type into factor
 
 ## Cuisines
 ```{r}
 unique(train_data$Cuisines)[1:10]
 ```
 From result above, one delivery order can contained some types of cuisines. We will doing One-Hot Encoding for every cuisines type.
-```{r}
-library(splitstackshape)
-splitstackshape:::charMat(strsplit(train_data$Cuisines, ", "), fill = 0L)
-```
-## Average Cost
-```{r}
-unique(train_data$Average_Cost)
-```
-We will remove the string `\u20b9` and ',' in every data then change it to numeric type.
-```{r}
-library(stringr)
-gsub('[\u20b9]|,', '', train_data$Average_Cost) %>% as.numeric() %>% 
-  unique()
-```
-## Minumum Order
-```{r}
-unique(train_data$Minimum_Order)
-```
-We will preprocess the minimum order with the method as same as the average cost
-```{r}
-gsub('[\u20b9]|,', '', train_data$Minimum_Order) %>% as.numeric() %>% 
-  unique()
-```
+
+## Average Cost and Minimum Order
+We will remove the string `\u20b9` and `,` in every data then change it to numeric type.
+
 ## Rating
-```{r}
-unique(train_data$Rating)
-```
-We will convert as numeric. If the Rating is `NEW`, `Opening Soon`, `Temporarily Closed`, or `-` we will change to NA.
-```{r}
-train_data$Rating %>% as.numeric() %>% unique()
-```
+We will convert as numeric. If the Rating is `NEW`, `Opening Soon`, `Temporarily Closed`, or `-` we will change to `NA`.
+
 ## Votes
-```{r}
-unique(train_data$Votes)
-```
 We will convert as numeric.
-```{r}
-train_data$Votes %>% as.numeric %>% unique()
-```
+
 ## Reviews
-```{r}
-unique(train_data$Reviews)
-```
+
 We will convert as numeric.
-```{r}
-train_data$Reviews %>% as.numeric %>% unique()
-```
+
 ## Delivery Times
-```{r}
-unique(train_data$Delivery_Time)
-```
-We will remove the " minutes" then convert it to numeric
-```{r}
-gsub('[ minutes]', '', train_data$Delivery_Time) %>%  as.numeric() %>% unique()
-```
+
+We will remove string ` minutes` then convert it to numeric
+
+# Splitting Data
 Splitting data into train_data and validation_data
 ```{r}
 set.seed(100)
@@ -127,12 +92,10 @@ set.seed(100)
 splitted <- initial_split(train_data, prop = 0.8, strata = 'Delivery_Time')
 splitted
 ```
-```{r}
-training(splitted)
-```
 
-# Pipeline using tidymodels
+# Pipeline Preprocessing using tidymodels
 ```{r}
+# Function to transform Location into City
 transform_location <- function(Location){
   if(Location %in% c("Mumbai", "Mumbai CST Area" , "Mumbai Central")){
     return ("Mumbai")
@@ -150,6 +113,8 @@ transform_location <- function(Location){
     return("Kolkata")
   }
 }
+
+# Preprocess Pipeline
 rec <- recipe(Delivery_Time~., data = training(splitted)) %>% 
   step_select(-Restaurant) %>% 
   step_mutate(
@@ -166,12 +131,17 @@ rec <- recipe(Delivery_Time~., data = training(splitted)) %>%
   prep()
 ```
 
+Create training and validation data
 ```{r}
 data_train <- juice(rec)
-data_validation <- bake(rec, testing(splitted))
 head(data_train)
+```
+```{r}
+data_validation <- bake(rec, testing(splitted))
 head(data_validation)
 ```
+
+Check if there is any `NA` value.
 ```{r}
 any(is.na(data_train))
 any(is.na(data_validation))
@@ -179,13 +149,22 @@ any(is.na(data_validation))
 # Modeling
 ## Regression Linear Model
 ```{r}
-reg_model <- linear_reg(mode = "regression",
-                        engine = "lm") %>% 
-              fit(formula=Delivery_Time ~ Location + Average_Cost + Minimum_Order + Rating + Votes + Reviews,
-                  data=data_train)
-reg_model
+#reg_model <- linear_reg(mode = "regression",
+#                        engine = "lm") %>% 
+#              fit(formula=Delivery_Time ~ Location + Average_Cost + Minimum_Order + #Rating + Votes + Reviews,
+#                  data=data_train)
+#reg_model
 ```
-## Nultinomial Regression
+```{r}
+# result <- data_validation %>% 
+#   select(Delivery_Time) %>% 
+#   bind_cols(predict(reg_model, new_data = data_validation))
+# 
+library(MLmetrics)
+# MAPE(result$Delivery_Time, result$.pred)
+```
+
+## Multinomial Regression
 ```{r}
 library(nnet)
 multi_model <- multinom_reg(mode = "classification",
@@ -200,64 +179,21 @@ data_validation %>%
   bind_cols(predict(multi_model, new_data=data_validation)) %>% 
   accuracy(truth = Delivery_Time, .pred_class)
 ```
-
+## Random Forest
 ```{r}
-library(stringr)
-clean_data <- train_data %>%
-              mutate(
-                Location = as.factor(Location),
-                Average_Cost = gsub('[\u20b9]|,', '', Average_Cost) %>% 
-                  as.numeric(),
-                Minimum_Order = gsub('[\u20b9]|,', '', Minimum_Order) %>% 
-                  as.numeric(),
-                #Rating = replace(Rating, (Rating =="-" |Rating == "NEW"), "0") %>% as.numeric(Rating),
-                #Votes = replace(Votes, Votes == "-", "0") %>% as.numeric(Votes),
-                #Reviews = replace(Reviews, Reviews == "-", "0") %>% as.numeric(Reviews),
-                Rating = as.numeric(Rating),
-                Votes = as.numeric(Votes),
-                Reviews = as.numeric(Reviews),
-                Delivery_Time = gsub('[ minutes]', '', Delivery_Time) %>% 
-                  as.numeric()
-              ) %>%
-              na.omit()
-clean_data
-```
-```{r}
-cuisines <- splitstackshape:::charMat(strsplit(clean_data$Cuisines, ", "), fill = "0") %>% 
-  as.data.frame(., stringsAsFactors = TRUE)
-
-cuisines2 <- splitstackshape:::charMat(strsplit(clean_data$Cuisines, ", "), fill = 0) %>% 
-  as.data.frame(.)
-
-cuisines2 <- as.data.frame(colSums(cuisines2), )
-colnames(cuisines2) <- c("Freq")
-cuisines2[order(cuisines2$Freq),]
-#cbind(clean_data, cuisines)
-```
-
-
-
-```{r}
-clean_data %>% 
-  cbind(., cuisines) %>% 
-  select(-c(Restaurant, Cuisines))
+set.seed(190)
+rf_model <- rand_forest(mode = "classification", 
+                        engine = "ranger",
+                        mtry = 10, 
+                        trees = 1000) %>% 
+            fit(Delivery_Time ~ ., data = data_train)
 ```
 
 ```{r}
-colSums(is.na(clean_data))
-```
-```{r}
-cor(clean_data[,sapply(clean_data, is.numeric)])
-```
-```{r}
-str(clean_data)
+data_validation %>% 
+  select(Delivery_Time) %>% 
+  bind_cols(predict(rf_model, new_data=data_validation)) %>% 
+  accuracy(truth = Delivery_Time, .pred_class)
 ```
 
-```{r}
-model1 <- glm(formula = Delivery_Time~Location+Average_Cost+Rating+Votes+Reviews, data = clean_data, family = Gamma)
-summary(model1)
-```
 
-```{r}
-hist(clean_data$Delivery_Time)
-```
