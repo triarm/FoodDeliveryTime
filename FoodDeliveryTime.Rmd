@@ -1,5 +1,5 @@
 ---
-title: "Food Delivery Time"
+title: "Food Delivery Time Prediction"
 author: "Tria Rahmat Mauludin"
 date: "2/25/2022"
 output: 
@@ -16,6 +16,9 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE,
                       message = FALSE)
 ```
+# Introduction
+
+# Objective
 
 # Import Library
 ```{r}
@@ -164,7 +167,7 @@ library(MLmetrics)
 # MAPE(result$Delivery_Time, result$.pred)
 ```
 
-## Multinomial Regression
+## Multinomial Classification
 ```{r}
 library(nnet)
 multi_model <- multinom_reg(mode = "classification",
@@ -195,5 +198,7 @@ data_validation %>%
   bind_cols(predict(rf_model, new_data=data_validation)) %>% 
   accuracy(truth = Delivery_Time, .pred_class)
 ```
+# Model Evaluation
 
+# Conclusion
 
