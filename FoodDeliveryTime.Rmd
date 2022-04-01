@@ -37,6 +37,25 @@ train_data <- read_excel("./dataset/Data_Train.xlsx")
 test_data <- read_excel("./dataset/Data_Test.xlsx")
 head(train_data)
 ```
+**Details:**
+
+- `Restaurant` : ID Restaurant
+
+- `Location` : Restaurant Location
+
+- `Cuisines` : The type of food that offered by the restaurant
+
+- `Average_Cost` : The average food price
+
+- `Minimum_Order` : Minimum purchase
+
+- `Rating` : The rating of the restaurant
+
+- `Votes` : The number of votes for the restaurant
+
+- `Reviews` : The number of review of the restaurant
+
+- `Delivery_Time` : The time need for delivery
 
 # Preprocess Data
 ```{r}
@@ -133,6 +152,8 @@ rec_regression <- recipe(Delivery_Time~., data = training(splitted)) %>%
     Delivery_Time = gsub('[ minutes]', '', Delivery_Time) %>%  as.numeric()
   ) %>% 
   step_dummy_extract(Cuisines, sep= ", ") %>%
+  step_mutate_at(starts_with("Cuisines"), fn = function(x)(as.factor(x)), skip=TRUE) %>%
+  step_select(-Cuisines_other) %>% 
   step_naomit(everything()) %>% 
   prep()
 
@@ -145,13 +166,13 @@ Create training and validation data
 ```{r}
 data_train_reg <- juice(rec_regression)
 data_train_cla <- juice(rec_classification)
-head(data_train_cla)
+head(data_train_reg)
 ```
 
 ```{r}
 data_validation_reg <- bake(rec_regression, testing(splitted))
 data_validation_cla <- bake(rec_classification, testing(splitted))
-head(data_validation_reg)
+head(data_validation_cla)
 ```
 
 Check if there is any `NA` value.
@@ -162,17 +183,35 @@ any(is.na(data_validation_reg))
 any(is.na(data_validation_cla))
 ```
 # EDA
+
 ## Time Distribution over Different Location
+
 ```{r}
-boxplot(Delivery_Time ~ Location, data = data_train_reg)
-```
-```{r}
-xtabs(~Location+Delivery_Time, data = data_train_reg)
+xtabs(~Location+Delivery_Time, data = data_train_reg) %>% 
+  heatmap(Colv = NA,
+          Rowv = NA,
+          xlab = 'Delivery Time',
+          ylab = 'Location',
+          main = 'Time Distribution over Location')
 ```
 ## Time Distribution over Rating
 ```{r}
-xtabs(~Rating+Delivery_Time, data = data_train_reg)
+xtabs(~Rating+Delivery_Time, data = data_train_reg) %>% 
+  heatmap(xlab='Delivery Time',
+          ylab='Rating',
+          Colv = NA,
+          Rowv = NA,
+          main = 'Time Distribution over Rating'
+          )
 ```
+
+```{r}
+table(data_train_reg$Delivery_Time) %>% barplot(xlab = 'Delivery Time',
+                                                ylab = 'Frequency',
+                                                main = 'Time Distribution')
+```
+
+> Almost all the restaurant needs 30 minutes for delivery time
 
 # Modeling
 ## Regression Linear Model
@@ -182,14 +221,6 @@ reg_model <- linear_reg(mode = "regression",
              fit(formula=Delivery_Time ~ Location + Average_Cost + Minimum_Order + Rating + Votes + Reviews,
                  data=data_train_reg)
 summary(reg_model$fit)
-```
-```{r}
-result <- data_validation_reg %>%
-  select(Delivery_Time) %>%
-  bind_cols(predict(reg_model, new_data = data_validation_reg))
- 
-library(MLmetrics)
-MAPE(result$Delivery_Time, result$.pred)
 ```
 
 ## Multinomial Classification
@@ -201,20 +232,50 @@ multi_model <- multinom_reg(mode = "classification",
                   data=data_train_cla, size = 10, maxit=100)
 ```
 
+
+## Random Forest
+```{r}
+set.seed(190)
+rf_model <- rand_forest(mode = "classification", 
+                        engine = "ranger",
+                        mtry = 5, 
+                        trees = 100) %>% 
+            fit(Delivery_Time ~ ., data = data_train_cla)
+```
+
+
+# Model Evaluation
+## Regression
+```{r}
+result <- data_validation_reg %>%
+  select(Delivery_Time) %>%
+  bind_cols(predict(reg_model, new_data = data_validation_reg))
+ 
+library(MLmetrics)
+MAPE(result$Delivery_Time, result$.pred)
+```
+
+## Neural Network
+```{r}
+data_train_cla %>% 
+  select(Delivery_Time) %>% 
+  bind_cols(predict(multi_model, new_data=data_train_cla)) %>% 
+  accuracy(truth = Delivery_Time, .pred_class)
+```
+
 ```{r}
 data_validation_cla %>% 
   select(Delivery_Time) %>% 
   bind_cols(predict(multi_model, new_data=data_validation_cla)) %>% 
   accuracy(truth = Delivery_Time, .pred_class)
 ```
+
 ## Random Forest
 ```{r}
-set.seed(190)
-rf_model <- rand_forest(mode = "classification", 
-                        engine = "ranger",
-                        mtry = 10, 
-                        trees = 1000) %>% 
-            fit(Delivery_Time ~ ., data = data_train_cla)
+data_train_cla %>% 
+  select(Delivery_Time) %>% 
+  bind_cols(predict(rf_model, new_data=data_train_cla)) %>% 
+  accuracy(truth = Delivery_Time, .pred_class)
 ```
 
 ```{r}
@@ -223,7 +284,7 @@ data_validation_cla %>%
   bind_cols(predict(rf_model, new_data=data_validation_cla)) %>% 
   accuracy(truth = Delivery_Time, .pred_class)
 ```
-# Model Evaluation
+
 
 # Conclusion
 
